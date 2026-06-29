@@ -5,6 +5,8 @@ A full-stack, production-ready LMS inspired by Udemy/Coursera — built with Typ
 ## 🚀 Live Demo
 **URL:** [https://veo-lms-challenge.vercel.app](https://veo-lms-challenge.vercel.app)
 
+**Assignment:** [assignment](https://blossom-flyingfish-887.notion.site/VeoLMS-Core-Team-Selection-Challenge-3861c302735180fe9e81f53bdb218f0c)
+
 ### Demo Credentials
 | Role | Email | Password |
 |------|-------|----------|
