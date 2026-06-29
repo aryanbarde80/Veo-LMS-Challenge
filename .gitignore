@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+*.log
+.vercel
+frontend/node_modules/
+api/node_modules/
+api/dist/
+drizzle/
