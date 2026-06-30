@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, CheckCircle, Play, Lock, ChevronDown, Menu, X, BookOpen, CheckCheck, Keyboard } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { ChevronLeft, CheckCircle, Play, ChevronDown, Menu, X, BookOpen, CheckCheck, Keyboard, Award } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
-import { Section, Lesson, LessonProgress } from '../types';
+import { Section, LessonProgress } from '../types';
 import VideoPlayer from '../components/player/VideoPlayer';
 import { cn, formatDuration } from '../lib/utils';
 import toast from 'react-hot-toast';
@@ -12,7 +12,6 @@ import toast from 'react-hot-toast';
 export default function LearnPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuthStore();
-  const qc = useQueryClient();
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
@@ -315,3 +314,4 @@ export default function LearnPage() {
       </div>
     </div>
   );
+}
