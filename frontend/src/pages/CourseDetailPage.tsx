@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, Users, BookOpen, Play, Lock, CheckCircle, ChevronDown, ChevronRight, Star, Award } from 'lucide-react';
+import { Clock, Users, BookOpen, Play, Lock, CheckCircle, ChevronDown, Star, Award } from 'lucide-react';
 import { api } from '../lib/api';
 import { Course, Section } from '../types';
 import { formatPrice, formatMinutes, formatDuration, difficultyColor, cn } from '../lib/utils';
@@ -152,6 +152,12 @@ export default function CourseDetailPage() {
                   <Award className="w-4 h-4" />
                   {course.language}
                 </span>
+                <span className="flex items-center gap-1 text-yellow-400">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className="w-3.5 h-3.5 fill-yellow-400" />
+                  ))}
+                  <span className="text-[#9B98B8] ml-1">4.8 (120+ ratings)</span>
+                </span>
               </div>
 
               <div className="flex items-center gap-3">
@@ -250,25 +256,26 @@ export default function CourseDetailPage() {
       <div className="max-w-7xl mx-auto px-4 py-10">
         <div className="grid lg:grid-cols-5 gap-10">
           <div className="lg:col-span-3 space-y-8">
+            {/* What you'll learn */}
+            {course.tags && course.tags.length > 0 && (
+              <div className="bg-[#1A1A2E] border border-[#2E2E4A] rounded-xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4">What you'll learn</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {course.tags.map((tag) => (
+                    <div key={tag} className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                      <span className="text-sm text-[#C5C3D8]">{tag}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Description */}
             <div>
               <h2 className="text-2xl font-bold text-white mb-4">About this course</h2>
               <div className="text-[#9B98B8] leading-relaxed whitespace-pre-line">{course.description}</div>
             </div>
-
-            {/* Tags */}
-            {course.tags && course.tags.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-3">Topics Covered</h3>
-                <div className="flex flex-wrap gap-2">
-                  {course.tags.map((tag) => (
-                    <span key={tag} className="px-3 py-1 bg-[#1A1A2E] border border-[#2E2E4A] rounded-full text-sm text-[#9B98B8]">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Curriculum */}
             <div>

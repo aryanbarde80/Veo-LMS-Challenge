@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { ChevronLeft, CheckCircle, Play, Lock, ChevronDown, Menu, X, BookOpen } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, CheckCircle, Play, Lock, ChevronDown, Menu, X, BookOpen, CheckCheck, Keyboard } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { Section, Lesson, LessonProgress } from '../types';
 import VideoPlayer from '../components/player/VideoPlayer';
 import { cn, formatDuration } from '../lib/utils';
+import toast from 'react-hot-toast';
 
 export default function LearnPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuthStore();
+  const qc = useQueryClient();
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   if (!user) return <Navigate to="/login" />;
 
@@ -34,12 +37,24 @@ export default function LearnPage() {
   const progress: LessonProgress[] = progressData?.progress || [];
   const lastWatched = progressData?.lastWatched;
 
-  // Set initial lesson
+  // Manual mark-complete mutation
+  const markCompleteMutation = useMutation({
+    mutationFn: () =>
+      api.post('/enrollments/progress', {
+        lessonId: activeLessonId,
+        courseId: course?.id,
+        watchedSeconds: 9999,
+        isCompleted: true,
+      }),
+    onSuccess: () => {
+      refetchProgress();
+      toast.success('Lesson marked as complete');
+    },
+  });
+
   useEffect(() => {
     if (sections.length > 0 && !activeLessonId) {
-      // Open all sections
       setOpenSections(new Set(sections.map((s) => s.id)));
-
       if (lastWatched) {
         setActiveLessonId(lastWatched.lessonId);
       } else {
@@ -55,10 +70,27 @@ export default function LearnPage() {
   const completedCount = progress.filter((p) => p.isCompleted).length;
   const totalLessons = allLessons.length;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+  const isCurrentCompleted = activeProgress?.isCompleted || false;
 
-  if (!course?.isEnrolled) {
-    return <Navigate to={`/courses/${slug}`} />;
-  }
+  const goToLesson = useCallback((id: string | undefined) => {
+    if (id) setActiveLessonId(id);
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const idx = allLessons.findIndex((l) => l.id === activeLessonId);
+      if (e.key === 'ArrowRight' || e.key === 'n') goToLesson(allLessons[idx + 1]?.id);
+      if (e.key === 'ArrowLeft' || e.key === 'p') goToLesson(allLessons[idx - 1]?.id);
+      if (e.key === 'm') markCompleteMutation.mutate();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeLessonId, allLessons]);
+
+  if (!course?.isEnrolled) return <Navigate to={`/courses/${slug}`} />;
 
   const toggleSection = (id: string) => {
     setOpenSections((prev) => {
@@ -68,7 +100,12 @@ export default function LearnPage() {
     });
   };
 
-  const isCompleted = (lessonId: string) => progress.find((p) => p.lessonId === lessonId)?.isCompleted || false;
+  const isCompleted = (lessonId: string) =>
+    progress.find((p) => p.lessonId === lessonId)?.isCompleted || false;
+
+  const idx = allLessons.findIndex((l) => l.id === activeLessonId);
+  const prevLesson = allLessons[idx - 1];
+  const nextLesson = allLessons[idx + 1];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F0F1A]">
@@ -91,6 +128,14 @@ export default function LearnPage() {
           </div>
           <span className="text-xs text-[#9B98B8] whitespace-nowrap">{completedCount}/{totalLessons}</span>
         </div>
+        {/* Keyboard shortcuts hint */}
+        <button
+          onClick={() => setShowShortcuts(!showShortcuts)}
+          className="hidden sm:flex p-1.5 text-[#9B98B8] hover:text-white rounded-lg hover:bg-[#242438] transition-colors"
+          title="Keyboard shortcuts"
+        >
+          <Keyboard className="w-4 h-4" />
+        </button>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 text-[#9B98B8] hover:text-white"
@@ -99,9 +144,25 @@ export default function LearnPage() {
         </button>
       </div>
 
+      {/* Keyboard shortcuts panel */}
+      {showShortcuts && (
+        <div className="border-b border-[#2E2E4A] bg-[#1A1A2E] px-4 py-3 flex flex-wrap gap-4 text-xs text-[#9B98B8]">
+          {[
+            { keys: '← / P', label: 'Previous lesson' },
+            { keys: '→ / N', label: 'Next lesson' },
+            { keys: 'M', label: 'Mark complete' },
+          ].map(({ keys, label }) => (
+            <span key={keys} className="flex items-center gap-2">
+              <kbd className="px-2 py-0.5 bg-[#242438] border border-[#2E2E4A] rounded text-white font-mono">{keys}</kbd>
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Video Area */}
+        {/* Video area */}
         <div className={cn('flex-1 overflow-y-auto', sidebarOpen ? 'hidden lg:block' : 'block')}>
           <div className="max-w-4xl mx-auto px-4 py-6">
             {activeLesson ? (
@@ -121,43 +182,57 @@ export default function LearnPage() {
                   </div>
                 )}
 
-                <div className="mt-6">
-                  <h1 className="text-2xl font-bold text-white mb-2">{activeLesson.title}</h1>
-                  {activeLesson.description && (
-                    <p className="text-[#9B98B8]">{activeLesson.description}</p>
-                  )}
-                  {activeLesson.content && (
-                    <div className="mt-4 prose prose-invert max-w-none text-[#9B98B8] whitespace-pre-line">
-                      {activeLesson.content}
-                    </div>
-                  )}
+                {/* Lesson info + complete button */}
+                <div className="mt-5 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-2xl font-bold text-white mb-2">{activeLesson.title}</h1>
+                    {activeLesson.description && (
+                      <p className="text-[#9B98B8]">{activeLesson.description}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => markCompleteMutation.mutate()}
+                    disabled={isCurrentCompleted || markCompleteMutation.isPending}
+                    className={cn(
+                      'shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border',
+                      isCurrentCompleted
+                        ? 'bg-green-500/10 text-green-400 border-green-500/30 cursor-default'
+                        : 'bg-[#1A1A2E] text-[#9B98B8] border-[#2E2E4A] hover:border-green-500/40 hover:text-green-400 active:scale-95'
+                    )}
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    {isCurrentCompleted ? 'Completed' : 'Mark Complete'}
+                  </button>
                 </div>
 
-                {/* Next/Prev navigation */}
+                {activeLesson.content && (
+                  <div className="mt-4 text-[#9B98B8] whitespace-pre-line leading-relaxed">
+                    {activeLesson.content}
+                  </div>
+                )}
+
+                {/* Prev / Next */}
                 <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#2E2E4A]">
-                  {(() => {
-                    const idx = allLessons.findIndex((l) => l.id === activeLessonId);
-                    const prev = allLessons[idx - 1];
-                    const next = allLessons[idx + 1];
-                    return (
-                      <>
-                        <button
-                          onClick={() => prev && setActiveLessonId(prev.id)}
-                          disabled={!prev}
-                          className="px-4 py-2 bg-[#1A1A2E] border border-[#2E2E4A] text-white rounded-lg text-sm disabled:opacity-40 hover:bg-[#242438] transition-colors"
-                        >
-                          ← Previous
-                        </button>
-                        <button
-                          onClick={() => next && setActiveLessonId(next.id)}
-                          disabled={!next}
-                          className="px-4 py-2 bg-[#6C47FF] hover:bg-[#5234DB] text-white rounded-lg text-sm disabled:opacity-40 transition-colors"
-                        >
-                          Next →
-                        </button>
-                      </>
-                    );
-                  })()}
+                  <button
+                    onClick={() => prevLesson && goToLesson(prevLesson.id)}
+                    disabled={!prevLesson}
+                    className="px-4 py-2 bg-[#1A1A2E] border border-[#2E2E4A] text-white rounded-xl text-sm disabled:opacity-40 hover:bg-[#242438] hover:border-[#6C47FF]/40 transition-all"
+                  >
+                    ← Previous
+                  </button>
+                  {nextLesson ? (
+                    <button
+                      onClick={() => goToLesson(nextLesson.id)}
+                      className="px-4 py-2 bg-[#6C47FF] hover:bg-[#5234DB] text-white rounded-xl text-sm transition-colors"
+                    >
+                      Next →
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 text-green-400 rounded-xl text-sm">
+                      <Award className="w-4 h-4" />
+                      Course Complete!
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -175,13 +250,14 @@ export default function LearnPage() {
         {sidebarOpen && (
           <div className="w-full lg:w-80 xl:w-96 border-l border-[#2E2E4A] bg-[#1A1A2E] overflow-y-auto shrink-0">
             <div className="p-4 border-b border-[#2E2E4A]">
-              <h2 className="font-semibold text-white text-sm">Course Curriculum</h2>
+              <h2 className="font-semibold text-white text-sm">Course Content</h2>
               <div className="mt-2 flex items-center gap-2">
                 <div className="flex-1 h-1.5 bg-[#2E2E4A] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#6C47FF] rounded-full" style={{ width: `${progressPercent}%` }} />
+                  <div className="h-full bg-[#6C47FF] rounded-full transition-all" style={{ width: `${progressPercent}%` }} />
                 </div>
                 <span className="text-xs text-[#9B98B8]">{progressPercent}%</span>
               </div>
+              <p className="text-xs text-[#9B98B8] mt-1">{completedCount} of {totalLessons} lessons completed</p>
             </div>
 
             <div className="divide-y divide-[#2E2E4A]">
@@ -195,7 +271,9 @@ export default function LearnPage() {
                       <ChevronDown className={cn('w-3 h-3 text-[#9B98B8] shrink-0 transition-transform', openSections.has(section.id) && 'rotate-180')} />
                       <span className="text-sm font-medium text-white truncate">{section.title}</span>
                     </div>
-                    <span className="text-xs text-[#9B98B8] shrink-0 ml-2">{section.lessons.length}</span>
+                    <span className="text-xs text-[#9B98B8] shrink-0 ml-2">
+                      {section.lessons.filter((l) => isCompleted(l.id)).length}/{section.lessons.length}
+                    </span>
                   </button>
 
                   {openSections.has(section.id) && (
@@ -220,7 +298,7 @@ export default function LearnPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn('text-xs leading-snug truncate', activeLessonId === lesson.id ? 'text-[#6C47FF] font-medium' : 'text-[#F0EFF8]')}>
+                            <p className={cn('text-xs leading-snug', activeLessonId === lesson.id ? 'text-[#6C47FF] font-medium' : 'text-[#F0EFF8]')}>
                               {lesson.title}
                             </p>
                             <p className="text-xs text-[#9B98B8] mt-0.5">{formatDuration(lesson.duration)}</p>
@@ -237,4 +315,3 @@ export default function LearnPage() {
       </div>
     </div>
   );
-}
