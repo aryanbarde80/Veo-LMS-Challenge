@@ -165,7 +165,9 @@ export default function AdminCourseContent() {
                   <Video className="w-4 h-4 text-[#9B98B8] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white truncate">{lesson.title}</p>
-                    {lesson.videoId && <p className="text-xs text-[#9B98B8]">YT: {lesson.videoId}</p>}
+                    {lesson.videoId && (
+                      <p className="text-xs text-[#9B98B8] truncate max-w-xs">{lesson.videoId.slice(0, 60)}{lesson.videoId.length > 60 ? '…' : ''}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-xs text-[#9B98B8]">{formatDuration(lesson.duration)}</span>
@@ -201,8 +203,9 @@ export default function AdminCourseContent() {
                     />
                     <input
                       value={lessonForm.videoId}
-                      onChange={(e) => setLessonForm((f) => ({ ...f, videoId: e.target.value }))}
-                      placeholder="YouTube Video ID (e.g. dQw4w9WgXcQ)"
+                      onChange={(e) => setLessonForm((f) => ({ ...f, videoId: e.target.value }))
+                      }
+                      placeholder="Direct video URL (https://...mp4)"
                       className="px-3 py-2 bg-[#1A1A2E] border border-[#2E2E4A] rounded-lg text-white placeholder-[#9B98B8] focus:outline-none focus:border-[#6C47FF] text-sm"
                     />
                     <input

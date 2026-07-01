@@ -169,7 +169,7 @@ export default function LearnPage() {
                 {activeLesson.type === 'video' && activeLesson.videoId ? (
                   <VideoPlayer
                     key={activeLesson.id}
-                    videoId={activeLesson.videoId}
+                    videoUrl={activeLesson.videoId}
                     lessonId={activeLesson.id}
                     courseId={course.id}
                     initialSeconds={activeProgress?.watchedSeconds || 0}
