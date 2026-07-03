@@ -1,0 +1,74 @@
+services:
+  # ---------------------------------------------------------------------
+  # Backend API — Express, deployed as a standard (non-serverless) web
+  # service. Unlike Vercel, Render gives this service a persistent disk,
+  # so self-hosted video uploads (api/src/lib/videoStorage.ts) actually
+  # survive restarts and redeploys here.
+  # ---------------------------------------------------------------------
+  - type: web
+    name: veolms-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: api
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    disk:
+      name: veolms-videos
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Where uploaded lesson videos are stored on the persistent disk above.
+      - key: VIDEO_UPLOAD_DIR
+        value: /opt/render/project/src/uploads/videos
+      # The frontend's Render URL — update after the frontend service below
+      # is created, or set manually in the Render dashboard. Used for CORS.
+      - key: FRONTEND_URL
+        value: https://veolms-frontend.onrender.com
+      # Secrets — do NOT put real values here. Set these in the Render
+      # dashboard under this service's Environment tab; `sync: false` means
+      # Render will prompt you for them instead of reading this file.
+      - key: JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+
+  # ---------------------------------------------------------------------
+  # Frontend — static Vite build.
+  # ---------------------------------------------------------------------
+  - type: web
+    name: veolms-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: commit
+    envVars:
+      # Render assigns each service a URL of the form
+      # https://<service-name>.onrender.com — this matches the "name" above.
+      # If Render appends a random suffix (happens if the name is already
+      # taken), update this to the real URL shown in your Render dashboard
+      # and redeploy the frontend.
+      - key: VITE_API_URL
+        value: https://veolms-api.onrender.com/api
+    routes:
+      # SPA fallback so client-side routes (e.g. /courses/foo) don't 404
+      # on a hard refresh.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
