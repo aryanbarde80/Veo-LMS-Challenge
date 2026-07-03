@@ -1,11 +1,14 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { db } from '../db';
-import { pdfDocuments, pdfAnalytics } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { pdfDocuments, pdfAnalytics, pdfViews } from '../db/schema';
+import { eq, and, desc, lte } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import { authenticate, AuthRequest } from '../middleware/auth';
+import { sendSuccess, sendError, asyncHandler, APIError, validateInput } from '../utils/errorHandler';
+import { createPDFSchema, updatePDFSchema } from '../utils/validators';
 
 const router = Router();
 
@@ -61,144 +64,235 @@ async function extractPdfMetadata(filePath: string) {
 }
 
 // Upload PDF
-router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const { courseId, sectionId, title, description } = req.body;
-    const userId = (req as any).userId;
-
-    if (!courseId || !title || !userId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Extract PDF metadata
-    const metadata = await extractPdfMetadata(req.file.path);
-
-    // Save PDF document to database
-    const pdfId = uuid();
-    const fileUrl = `/uploads/${req.file.filename}`;
-
-    await db.insert(pdfDocuments).values({
-      id: pdfId,
-      courseId,
-      sectionId: sectionId || null,
-      title,
-      description: description || null,
-      fileName: req.file.originalname,
-      fileSize: req.file.size,
-      fileUrl,
-      pageCount: metadata.pageCount,
-      wordCount: metadata.wordCount,
-      readingTimeMinutes: metadata.readingTimeMinutes,
-      uploadedBy: userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    // Create analytics entry
-    await db.insert(pdfAnalytics).values({
-      id: uuid(),
-      pdfId,
-      totalViews: 0,
-      totalDownloads: 0,
-      averageReadingTime: 0,
-      engagementScore: 0,
-      lastAnalyzedAt: new Date(),
-    });
-
-    res.json({ 
-      message: 'PDF uploaded successfully',
-      pdfId,
-      metadata 
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: 'Failed to upload PDF' });
+router.post('/upload', authenticate, upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new APIError(400, 'No file uploaded');
   }
-});
+
+  const { courseId, sectionId, title, description } = req.body;
+  const userId = (req as AuthRequest).userId;
+
+  // Validate input
+  const pdfData = validateInput(createPDFSchema, {
+    courseId,
+    sectionId,
+    title,
+    description,
+    fileName: req.file.originalname,
+    fileUrl: `/uploads/${req.file.filename}`,
+    pageCount: 0,
+    wordCount: 0,
+    readingTimeMinutes: 0,
+  });
+
+  // Extract PDF metadata
+  const metadata = await extractPdfMetadata(req.file.path);
+
+  // Save PDF document to database
+  const pdfId = uuid();
+  const fileUrl = `/uploads/${req.file.filename}`;
+
+  const [pdf] = await db.insert(pdfDocuments).values({
+    id: pdfId,
+    courseId: pdfData.courseId,
+    sectionId: pdfData.sectionId || undefined,
+    title: pdfData.title,
+    description: pdfData.description || undefined,
+    fileName: req.file.originalname,
+    fileSize: req.file.size,
+    fileUrl,
+    pageCount: metadata.pageCount,
+    wordCount: metadata.wordCount,
+    readingTimeMinutes: metadata.readingTimeMinutes,
+    uploadedBy: userId,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning();
+
+  // Create analytics entry
+  await db.insert(pdfAnalytics).values({
+    id: uuid(),
+    pdfId,
+    totalViews: 0,
+    totalDownloads: 0,
+    averageReadingTime: 0,
+    engagementScore: 0,
+    lastAnalyzedAt: new Date(),
+  });
+
+  sendSuccess(res, {
+    message: 'PDF uploaded successfully',
+    pdfId,
+    pdf,
+    metadata,
+  }, 201);
+}));
 
 // Get all PDFs for a course
-router.get('/course/:courseId', async (req: Request, res: Response) => {
-  try {
-    const { courseId } = req.params;
+router.get('/course/:courseId', asyncHandler(async (req: Request, res: Response) => {
+  const { courseId } = req.params;
+  const { page = '1', limit = '10', sort = '-createdAt' } = req.query;
 
-    const pdfs = await db
-      .select()
-      .from(pdfDocuments)
-      .where(eq(pdfDocuments.courseId, courseId));
+  const pageNum = Math.max(1, parseInt(page as string) || 1);
+  const pageSize = Math.max(1, Math.min(100, parseInt(limit as string) || 10));
+  const offset = (pageNum - 1) * pageSize;
 
-    res.json({ pdfs });
-  } catch (error) {
-    console.error('Error fetching PDFs:', error);
-    res.status(500).json({ error: 'Failed to fetch PDFs' });
+  const pdfs = await db
+    .select()
+    .from(pdfDocuments)
+    .where(eq(pdfDocuments.courseId, courseId))
+    .orderBy(desc(pdfDocuments.createdAt))
+    .limit(pageSize)
+    .offset(offset);
+
+  const total = pdfs.length;
+
+  sendSuccess(res, {
+    pdfs,
+    pagination: { page: pageNum, limit: pageSize, total },
+  });
+}));
+
+// Get PDF details with analytics
+router.get('/:pdfId', asyncHandler(async (req: Request, res: Response) => {
+  const { pdfId } = req.params;
+
+  const pdf = await db
+    .select()
+    .from(pdfDocuments)
+    .where(eq(pdfDocuments.id, pdfId))
+    .limit(1);
+
+  if (!pdf.length) {
+    throw new APIError(404, 'PDF not found');
   }
-});
 
-// Get PDF with analytics
-router.get('/:pdfId/analytics', async (req: Request, res: Response) => {
-  try {
-    const { pdfId } = req.params;
+  const analytics = await db
+    .select()
+    .from(pdfAnalytics)
+    .where(eq(pdfAnalytics.pdfId, pdfId))
+    .limit(1);
 
-    const pdf = await db
-      .select()
-      .from(pdfDocuments)
-      .where(eq(pdfDocuments.id, pdfId));
+  sendSuccess(res, {
+    pdf: pdf[0],
+    analytics: analytics[0] || null,
+  });
+}));
 
-    if (!pdf.length) {
-      return res.status(404).json({ error: 'PDF not found' });
-    }
+// Get PDF analytics
+router.get('/:pdfId/analytics', asyncHandler(async (req: Request, res: Response) => {
+  const { pdfId } = req.params;
 
-    const analytics = await db
-      .select()
-      .from(pdfAnalytics)
-      .where(eq(pdfAnalytics.pdfId, pdfId));
+  const analytics = await db
+    .select()
+    .from(pdfAnalytics)
+    .where(eq(pdfAnalytics.pdfId, pdfId))
+    .limit(1);
 
-    res.json({ 
-      pdf: pdf[0],
-      analytics: analytics[0] || null
+  if (!analytics.length) {
+    throw new APIError(404, 'Analytics not found');
+  }
+
+  sendSuccess(res, analytics[0]);
+}));
+
+// Track PDF view
+router.post('/:pdfId/view', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const { pdfId } = req.params;
+  const userId = (req as AuthRequest).userId;
+  const { completionPercentage = 0 } = req.body;
+
+  // Check if PDF exists
+  const pdf = await db
+    .select()
+    .from(pdfDocuments)
+    .where(eq(pdfDocuments.id, pdfId))
+    .limit(1);
+
+  if (!pdf.length) {
+    throw new APIError(404, 'PDF not found');
+  }
+
+  // Record or update view
+  const existingView = await db
+    .select()
+    .from(pdfViews)
+    .where(and(eq(pdfViews.pdfId, pdfId), eq(pdfViews.userId, userId)))
+    .limit(1);
+
+  if (existingView.length) {
+    // Update existing view
+    await db
+      .update(pdfViews)
+      .set({
+        completionPercentage,
+        lastViewedAt: new Date(),
+      })
+      .where(and(eq(pdfViews.pdfId, pdfId), eq(pdfViews.userId, userId)));
+  } else {
+    // Create new view
+    await db.insert(pdfViews).values({
+      id: uuid(),
+      pdfId,
+      userId,
+      completionPercentage,
+      totalTimeSpent: 0,
+      viewedPages: [],
+      lastViewedAt: new Date(),
+      createdAt: new Date(),
     });
-  } catch (error) {
-    console.error('Error fetching analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch analytics' });
   }
-});
+
+  // Update analytics
+  const analytics = await db
+    .select()
+    .from(pdfAnalytics)
+    .where(eq(pdfAnalytics.pdfId, pdfId))
+    .limit(1);
+
+  if (analytics.length) {
+    const currentViews = analytics[0].totalViews || 0;
+    await db
+      .update(pdfAnalytics)
+      .set({
+        totalViews: currentViews + 1,
+        lastAnalyzedAt: new Date(),
+      })
+      .where(eq(pdfAnalytics.pdfId, pdfId));
+  }
+
+  sendSuccess(res, { message: 'View recorded successfully' });
+}));
 
 // Delete PDF
-router.delete('/:pdfId', async (req: Request, res: Response) => {
-  try {
-    const { pdfId } = req.params;
-    const userId = (req as any).userId;
+router.delete('/:pdfId', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const { pdfId } = req.params;
+  const userId = (req as AuthRequest).userId;
 
-    const pdf = await db
-      .select()
-      .from(pdfDocuments)
-      .where(eq(pdfDocuments.id, pdfId));
+  const pdf = await db
+    .select()
+    .from(pdfDocuments)
+    .where(eq(pdfDocuments.id, pdfId))
+    .limit(1);
 
-    if (!pdf.length) {
-      return res.status(404).json({ error: 'PDF not found' });
-    }
-
-    if (pdf[0].uploadedBy !== userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    // Delete file from storage
-    const filePath = path.join(uploadDir, path.basename(pdf[0].fileUrl));
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    // Delete from database (cascades to analytics and views)
-    await db.delete(pdfDocuments).where(eq(pdfDocuments.id, pdfId));
-
-    res.json({ message: 'PDF deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting PDF:', error);
-    res.status(500).json({ error: 'Failed to delete PDF' });
+  if (!pdf.length) {
+    throw new APIError(404, 'PDF not found');
   }
-});
+
+  if (pdf[0].uploadedBy !== userId) {
+    throw new APIError(403, 'Unauthorized to delete this PDF');
+  }
+
+  // Delete file from storage
+  const filePath = path.join(uploadDir, path.basename(pdf[0].fileUrl));
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+
+  // Delete from database (cascades to analytics and views)
+  await db.delete(pdfDocuments).where(eq(pdfDocuments.id, pdfId));
+
+  sendSuccess(res, { message: 'PDF deleted successfully' });
+}));
 
 export default router;
