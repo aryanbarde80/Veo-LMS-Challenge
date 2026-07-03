@@ -166,12 +166,12 @@ export default function LearnPage() {
           <div className="max-w-4xl mx-auto px-4 py-6">
             {activeLesson ? (
               <>
-                {activeLesson.type === 'video' && activeLesson.videoId ? (
+                {activeLesson.type === 'video' && activeLesson.videoFile ? (
                   <VideoPlayer
                     key={activeLesson.id}
-                    videoId={activeLesson.videoId}
                     lessonId={activeLesson.id}
                     courseId={course.id}
+                    title={activeLesson.title}
                     initialSeconds={activeProgress?.watchedSeconds || 0}
                     onProgress={() => refetchProgress()}
                   />

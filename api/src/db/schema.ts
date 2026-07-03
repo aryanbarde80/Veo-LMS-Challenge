@@ -3,6 +3,7 @@ import { relations } from 'drizzle-orm';
 
 export const userRoleEnum = pgEnum('user_role', ['student', 'admin']);
 export const lessonTypeEnum = pgEnum('lesson_type', ['video', 'text']);
+export const videoSourceEnum = pgEnum('video_source', ['upload', 'youtube']);
 export const difficultyEnum = pgEnum('difficulty', ['beginner', 'intermediate', 'advanced']);
 
 // Users
@@ -64,7 +65,11 @@ export const lessons = pgTable('lessons', {
   courseId: uuid('course_id').references(() => courses.id, { onDelete: 'cascade' }).notNull(),
   title: text('title').notNull(),
   description: text('description'),
-  videoId: text('video_id'), // YouTube video ID
+  videoId: text('video_id'), // YouTube video ID (legacy/optional fallback)
+  videoFile: text('video_file'), // filename on self-hosted storage (uploads dir or bucket key)
+  videoSource: videoSourceEnum('video_source').notNull().default('upload'),
+  videoSize: integer('video_size'), // bytes, used for Range streaming
+  videoMimeType: text('video_mime_type'),
   duration: integer('duration').notNull().default(0), // in seconds
   order: integer('order').notNull().default(0),
   type: lessonTypeEnum('type').notNull().default('video'),

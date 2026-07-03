@@ -157,9 +157,12 @@ router.get('/:slug', optionalAuth, async (req: AuthRequest, res: Response) => {
         .filter((l) => l.sectionId === s.id)
         .map((l) => ({
           ...l,
-          // Hide video ID for non-preview lessons if not enrolled/admin
-          videoId:
-            l.isPreview || isEnrolled || req.user?.role === 'admin' ? l.videoId : null,
+          // Hide video source for non-preview lessons if not enrolled/admin.
+          // (The streaming endpoint itself is separately protected by a signed,
+          // per-user token — this is defense in depth so the filename/ID isn't
+          // even visible in the API response.)
+          videoId: l.isPreview || isEnrolled || req.user?.role === 'admin' ? l.videoId : null,
+          videoFile: l.isPreview || isEnrolled || req.user?.role === 'admin' ? l.videoFile : null,
         })),
     }));
 

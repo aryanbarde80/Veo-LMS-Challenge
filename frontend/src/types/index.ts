@@ -46,6 +46,8 @@ export interface Lesson {
   title: string;
   description?: string;
   videoId?: string | null;
+  videoFile?: string | null;
+  videoSource?: 'upload' | 'youtube';
   duration: number;
   order: number;
   type: 'video' | 'text';

@@ -8,10 +8,27 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+// Lazily construct the Razorpay client. Building it at module load time means a
+// missing/invalid RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET throws during import and
+// crashes the ENTIRE serverless function (every route, not just payments) on Vercel.
+// Constructing it on first use turns that into a normal, catchable 500 on the
+// payment routes only, and gives you a clear log line telling you what's missing.
+let razorpay: Razorpay | null = null;
+function getRazorpay(): Razorpay {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error(
+      'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set in the environment. ' +
+      'Set them in Vercel → Project → Settings → Environment Variables and redeploy.'
+    );
+  }
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpay;
+}
 
 // POST /api/payments/create-order
 router.post('/create-order', authenticate, async (req: AuthRequest, res: Response) => {
@@ -47,7 +64,7 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
       return res.json({ enrolled: true, enrollment });
     }
 
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount,
       currency: 'INR',
       receipt: `veo_${Date.now()}`,
@@ -69,8 +86,11 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
       keyId: process.env.RAZORPAY_KEY_ID,
       courseName: course.title,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Create order error:', err);
+    if (err?.message?.includes('RAZORPAY_KEY')) {
+      return res.status(500).json({ error: 'Payments are not configured on the server yet.' });
+    }
     return res.status(500).json({ error: 'Failed to create payment order' });
   }
 });

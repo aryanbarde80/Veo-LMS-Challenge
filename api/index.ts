@@ -11,6 +11,7 @@ import sectionsRoutes from './src/routes/sections';
 import paymentsRoutes from './src/routes/payments';
 import enrollmentsRoutes from './src/routes/enrollments';
 import adminRoutes from './src/routes/admin';
+import videosRoutes from './src/routes/videos';
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/sections', sectionsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/videos', videosRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

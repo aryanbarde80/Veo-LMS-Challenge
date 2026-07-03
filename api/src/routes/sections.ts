@@ -4,6 +4,7 @@ import { db } from '../db';
 import { sections, lessons, courses } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
+import { deleteVideoFile } from '../lib/videoStorage';
 
 const router = Router();
 
@@ -56,6 +57,10 @@ const lessonSchema = z.object({
   title: z.string().min(2).max(200),
   description: z.string().optional(),
   videoId: z.string().optional(),
+  videoFile: z.string().optional(),
+  videoSource: z.enum(['upload', 'youtube']).optional(),
+  videoSize: z.number().int().optional(),
+  videoMimeType: z.string().optional(),
   duration: z.number().int().min(0).optional(),
   order: z.number().int().min(0).optional(),
   type: z.enum(['video', 'text']).optional(),
@@ -92,7 +97,15 @@ router.put('/lessons/:id', authenticate, requireAdmin, async (req: AuthRequest, 
 
 router.delete('/lessons/:id', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
+    const [existing] = await db.select().from(lessons).where(eq(lessons.id, req.params.id)).limit(1);
     await db.delete(lessons).where(eq(lessons.id, req.params.id));
+    if (existing?.videoFile) {
+      try {
+        deleteVideoFile(existing.videoFile);
+      } catch {
+        // non-fatal - lesson row is already gone, an orphaned file can be cleaned up later
+      }
+    }
     return res.json({ message: 'Lesson deleted' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete lesson' });

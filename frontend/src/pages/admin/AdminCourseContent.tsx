@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Plus, Edit, Trash2, Video, Lock, Unlock, Loader2, X, Save } from 'lucide-react';
+import { ChevronLeft, Plus, Edit, Trash2, Video, Lock, Unlock, Loader2, X, Save, Upload, FileVideo, CheckCircle2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 import { Section, Lesson } from '../../types';
@@ -17,7 +17,51 @@ export default function AdminCourseContent() {
   const [addingSection, setAddingSection] = useState(false);
   const [sectionTitle, setSectionTitle] = useState('');
   const [addingLessonFor, setAddingLessonFor] = useState<string | null>(null);
-  const [lessonForm, setLessonForm] = useState({ title: '', videoId: '', duration: '0', isPreview: false, description: '' });
+  const [lessonForm, setLessonForm] = useState({
+    title: '', duration: '0', isPreview: false, description: '',
+    videoFile: '', videoSize: 0, videoMimeType: '',
+  });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [videoFileName, setVideoFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const resetLessonForm = () =>
+    setLessonForm({ title: '', duration: '0', isPreview: false, description: '', videoFile: '', videoSize: 0, videoMimeType: '' });
+
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxBytes = 2 * 1024 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error('Video must be under 2GB');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+    setVideoFileName(file.name);
+
+    const formData = new FormData();
+    formData.append('video', file);
+
+    try {
+      const { data } = await api.post('/videos/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (evt) => {
+          if (evt.total) setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+        },
+      });
+      setLessonForm((f) => ({ ...f, videoFile: data.videoFile, videoSize: data.videoSize, videoMimeType: data.videoMimeType }));
+      toast.success('Video uploaded!');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      setVideoFileName('');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data } = useQuery({
     queryKey: ['admin-course', courseId],
@@ -56,21 +100,30 @@ export default function AdminCourseContent() {
   });
 
   const addLesson = useMutation({
-    mutationFn: (sectionId: string) => api.post('/sections/lessons', {
-      sectionId,
-      courseId,
-      title: lessonForm.title,
-      videoId: lessonForm.videoId || undefined,
-      duration: parseInt(lessonForm.duration) || 0,
-      isPreview: lessonForm.isPreview,
-      description: lessonForm.description || undefined,
-      order: sections.find(s => s.id === sectionId)?.lessons.length + 1 || 1,
-      type: 'video',
-    }),
+    mutationFn: (sectionId: string) => {
+      if (!lessonForm.videoFile) {
+        throw new Error('Please upload a video file first');
+      }
+      return api.post('/sections/lessons', {
+        sectionId,
+        courseId,
+        title: lessonForm.title,
+        videoFile: lessonForm.videoFile,
+        videoSource: 'upload',
+        videoSize: lessonForm.videoSize || undefined,
+        videoMimeType: lessonForm.videoMimeType || undefined,
+        duration: parseInt(lessonForm.duration) || 0,
+        isPreview: lessonForm.isPreview,
+        description: lessonForm.description || undefined,
+        order: sections.find(s => s.id === sectionId)?.lessons.length + 1 || 1,
+        type: 'video',
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-course', courseId] });
       setAddingLessonFor(null);
-      setLessonForm({ title: '', videoId: '', duration: '0', isPreview: false, description: '' });
+      resetLessonForm();
+      setVideoFileName('');
       toast.success('Lesson added!');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
@@ -143,7 +196,8 @@ export default function AdminCourseContent() {
                   <button
                     onClick={() => {
                       setAddingLessonFor(section.id);
-                      setLessonForm({ title: '', videoId: '', duration: '0', isPreview: false, description: '' });
+                      resetLessonForm();
+                      setVideoFileName('');
                     }}
                     className="flex items-center gap-1 px-3 py-1.5 bg-[#6C47FF]/20 hover:bg-[#6C47FF]/30 text-[#6C47FF] rounded-lg text-xs transition-colors"
                   >
@@ -165,7 +219,11 @@ export default function AdminCourseContent() {
                   <Video className="w-4 h-4 text-[#9B98B8] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white truncate">{lesson.title}</p>
-                    {lesson.videoId && <p className="text-xs text-[#9B98B8]">YT: {lesson.videoId}</p>}
+                    {lesson.videoFile && (
+                      <p className="text-xs text-[#9B98B8] flex items-center gap-1">
+                        <FileVideo className="w-3 h-3" /> Uploaded video{lesson.videoSource === 'youtube' ? ' (YouTube legacy)' : ''}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-xs text-[#9B98B8]">{formatDuration(lesson.duration)}</span>
@@ -199,12 +257,52 @@ export default function AdminCourseContent() {
                       placeholder="Lesson title *"
                       className="px-3 py-2 bg-[#1A1A2E] border border-[#2E2E4A] rounded-lg text-white placeholder-[#9B98B8] focus:outline-none focus:border-[#6C47FF] text-sm"
                     />
-                    <input
-                      value={lessonForm.videoId}
-                      onChange={(e) => setLessonForm((f) => ({ ...f, videoId: e.target.value }))}
-                      placeholder="YouTube Video ID (e.g. dQw4w9WgXcQ)"
-                      className="px-3 py-2 bg-[#1A1A2E] border border-[#2E2E4A] rounded-lg text-white placeholder-[#9B98B8] focus:outline-none focus:border-[#6C47FF] text-sm"
-                    />
+
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                        onChange={handleVideoSelect}
+                        className="hidden"
+                      />
+                      {!lessonForm.videoFile && !uploading && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#1A1A2E] border border-dashed border-[#2E2E4A] rounded-lg text-[#9B98B8] hover:border-[#6C47FF] hover:text-[#6C47FF] text-sm transition-colors"
+                        >
+                          <Upload className="w-3.5 h-3.5" /> Upload video file *
+                        </button>
+                      )}
+                      {uploading && (
+                        <div className="w-full px-3 py-2 bg-[#1A1A2E] border border-[#2E2E4A] rounded-lg">
+                          <div className="flex items-center gap-2 text-xs text-[#9B98B8] mb-1.5">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Uploading {videoFileName}... {uploadProgress}%
+                          </div>
+                          <div className="w-full h-1.5 bg-[#0F0F1A] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#6C47FF] transition-all" style={{ width: `${uploadProgress}%` }} />
+                          </div>
+                        </div>
+                      )}
+                      {lessonForm.videoFile && !uploading && (
+                        <div className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-[#1A1A2E] border border-green-500/30 rounded-lg text-sm">
+                          <span className="flex items-center gap-2 text-green-400 truncate">
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{videoFileName}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setLessonForm((f) => ({ ...f, videoFile: '', videoSize: 0, videoMimeType: '' })); setVideoFileName(''); }}
+                            className="text-[#9B98B8] hover:text-white shrink-0"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <input
                       value={lessonForm.description}
                       onChange={(e) => setLessonForm((f) => ({ ...f, description: e.target.value }))}
@@ -237,8 +335,8 @@ export default function AdminCourseContent() {
                         Cancel
                       </button>
                       <button
-                        onClick={() => lessonForm.title && addLesson.mutate(section.id)}
-                        disabled={!lessonForm.title || addLesson.isPending}
+                        onClick={() => lessonForm.title && lessonForm.videoFile && addLesson.mutate(section.id)}
+                        disabled={!lessonForm.title || !lessonForm.videoFile || uploading || addLesson.isPending}
                         className="flex items-center gap-2 px-4 py-1.5 bg-[#6C47FF] text-white rounded-lg text-sm disabled:opacity-50"
                       >
                         {addLesson.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
