@@ -11,6 +11,7 @@ import SignupPage from './pages/auth/SignupPage';
 import StudentDashboard from './pages/student/StudentDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCourseContent from './pages/admin/AdminCourseContent';
+import AdminPDFManagement from './pages/admin/AdminPDFManagement';
 import { useAuthStore } from './store/authStore';
 
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/learn/:slug" element={<ProtectedRoute><LearnPage /></ProtectedRoute>} />
           <Route path="/admin" element={<><Navbar /><ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute></>} />
           <Route path="/admin/courses/:courseId" element={<><Navbar /><ProtectedRoute adminOnly><AdminCourseContent /></ProtectedRoute></>} />
+          <Route path="/admin/pdfs/:courseId" element={<><Navbar /><ProtectedRoute adminOnly><AdminPDFManagement /></ProtectedRoute></>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster

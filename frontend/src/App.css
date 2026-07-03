@@ -1,17 +1,113 @@
 /* All application styles are in index.css via Tailwind.
    This file is intentionally minimal — no Vite boilerplate. */
 
+:root {
+  --primary: #6C47FF;
+  --secondary: #00D4FF;
+  --success: #00FF88;
+  --warning: #FFB800;
+  --danger: #FF6B35;
+  --dark-bg: #0A0E27;
+  --darker-bg: #1A1A2E;
+  --darkest-bg: #16213E;
+  --border-color: #2E2E4A;
+  --text-primary: #F0EFF8;
+  --text-secondary: #9B98B8;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
 .gradient-text {
+  background: linear-gradient(135deg, #6C47FF, #00D4FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-warm {
   background: linear-gradient(135deg, #6C47FF, #FF6B35);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.gradient-bg {
+  background: linear-gradient(135deg, #6C47FF 0%, #00D4FF 100%);
 }
+
+.gradient-bg-warm {
+  background: linear-gradient(135deg, #6C47FF 0%, #FF6B35 100%);
+}
+
+.gradient-border {
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  background-image: linear-gradient(135deg, #6C47FF, #00D4FF);
+  background-origin: border;
+}
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
 .card-hover:hover {
   transform: translateY(-4px);
   box-shadow: 0 20px 40px rgba(108, 71, 255, 0.15);
+  border-color: rgba(108, 71, 255, 0.5);
+}
+
+.glass-effect {
+  background: rgba(26, 26, 46, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(46, 46, 74, 0.5);
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(108, 71, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(108, 71, 255, 0);
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }

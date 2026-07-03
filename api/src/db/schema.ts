@@ -143,3 +143,66 @@ export const lessonProgressRelations = relations(lessonProgress, ({ one }) => ({
   lesson: one(lessons, { fields: [lessonProgress.lessonId], references: [lessons.id] }),
   course: one(courses, { fields: [lessonProgress.courseId], references: [courses.id] }),
 }));
+
+// PDF Documents
+export const pdfDocuments = pgTable('pdf_documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  courseId: uuid('course_id').references(() => courses.id, { onDelete: 'cascade' }).notNull(),
+  sectionId: uuid('section_id').references(() => sections.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  fileName: text('file_name').notNull(),
+  fileSize: integer('file_size').notNull(),
+  fileUrl: text('file_url').notNull(),
+  pageCount: integer('page_count').notNull().default(0),
+  wordCount: integer('word_count').notNull().default(0),
+  readingTimeMinutes: integer('reading_time_minutes').notNull().default(0),
+  keywordTags: text('keyword_tags').array(),
+  language: text('language').notNull().default('English'),
+  uploadedBy: uuid('uploaded_by').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// PDF Analytics/Metrics
+export const pdfAnalytics = pgTable('pdf_analytics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pdfId: uuid('pdf_id').references(() => pdfDocuments.id, { onDelete: 'cascade' }).notNull(),
+  totalViews: integer('total_views').notNull().default(0),
+  totalDownloads: integer('total_downloads').notNull().default(0),
+  averageReadingTime: integer('average_reading_time').notNull().default(0),
+  engagementScore: decimal('engagement_score', { precision: 5, scale: 2 }).notNull().default('0'),
+  sentimentScore: decimal('sentiment_score', { precision: 5, scale: 2 }),
+  readabilityIndex: decimal('readability_index', { precision: 5, scale: 2 }),
+  lastAnalyzedAt: timestamp('last_analyzed_at').defaultNow().notNull(),
+});
+
+// PDF User Interactions
+export const pdfViews = pgTable('pdf_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pdfId: uuid('pdf_id').references(() => pdfDocuments.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  viewedPages: integer('viewed_pages').array().notNull().default([]),
+  totalTimeSpent: integer('total_time_spent').notNull().default(0),
+  completionPercentage: integer('completion_percentage').notNull().default(0),
+  lastViewedAt: timestamp('last_viewed_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Relations
+export const pdfDocumentsRelations = relations(pdfDocuments, ({ one, many }) => ({
+  course: one(courses, { fields: [pdfDocuments.courseId], references: [courses.id] }),
+  section: one(sections, { fields: [pdfDocuments.sectionId], references: [sections.id] }),
+  uploadedByUser: one(users, { fields: [pdfDocuments.uploadedBy], references: [users.id] }),
+  analytics: one(pdfAnalytics),
+  views: many(pdfViews),
+}));
+
+export const pdfAnalyticsRelations = relations(pdfAnalytics, ({ one }) => ({
+  pdf: one(pdfDocuments, { fields: [pdfAnalytics.pdfId], references: [pdfDocuments.id] }),
+}));
+
+export const pdfViewsRelations = relations(pdfViews, ({ one }) => ({
+  pdf: one(pdfDocuments, { fields: [pdfViews.pdfId], references: [pdfDocuments.id] }),
+  user: one(users, { fields: [pdfViews.userId], references: [users.id] }),
+}));

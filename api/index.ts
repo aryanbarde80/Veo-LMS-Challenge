@@ -11,6 +11,7 @@ import sectionsRoutes from './src/routes/sections';
 import paymentsRoutes from './src/routes/payments';
 import enrollmentsRoutes from './src/routes/enrollments';
 import adminRoutes from './src/routes/admin';
+import pdfRoutes from './src/routes/pdfs';
 
 const app = express();
 
@@ -44,6 +45,10 @@ app.use('/api/sections', sectionsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pdfs', pdfRoutes);
+
+// Serve static files for uploads
+app.use('/uploads', express.static('uploads'));
 
 // ─── Health check — tells you exactly what env vars are missing ───────────────
 app.get('/api/health', async (_req, res) => {

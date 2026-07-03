@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Plus, Edit, Trash2, Video, Lock, Unlock, Loader2, X, Save } from 'lucide-react';
+import { ChevronLeft, Plus, Edit, Trash2, Video, Lock, Unlock, Loader2, X, Save, FileText } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 import { Section, Lesson } from '../../types';
@@ -94,12 +94,20 @@ export default function AdminCourseContent() {
 
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-white">Manage Content</h1>
-          <button
-            onClick={() => setAddingSection(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6C47FF] hover:bg-[#5234DB] text-white rounded-xl text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Section
-          </button>
+          <div className="flex gap-3">
+            <Link
+              to={`/admin/pdfs/${courseId}`}
+              className="flex items-center gap-2 px-4 py-2 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/30 rounded-xl text-sm font-medium transition-colors"
+            >
+              <FileText className="w-4 h-4" /> Manage PDFs
+            </Link>
+            <button
+              onClick={() => setAddingSection(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#6C47FF] hover:bg-[#5234DB] text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add Section
+            </button>
+          </div>
         </div>
 
         {/* Add Section Form */}
