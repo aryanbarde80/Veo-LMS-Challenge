@@ -1,17 +1,16 @@
 import { useState, useRef } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Plus, Edit, Trash2, Video, Lock, Unlock, Loader2, X, Save, Upload, FileVideo, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Video, Lock, Unlock, Loader2, X, Save, Upload, FileVideo, CheckCircle2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
-import { Section, Lesson } from '../../types';
+import { Section } from '../../types';
 import { formatDuration, getErrorMessage } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 export default function AdminCourseContent() {
   const { courseId } = useParams<{ courseId: string }>();
   const { user } = useAuthStore();
-  if (!user || user.role !== 'admin') return <Navigate to="/" />;
 
   const qc = useQueryClient();
   const [addingSection, setAddingSection] = useState(false);
@@ -134,6 +133,8 @@ export default function AdminCourseContent() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-course', courseId] }); toast.success('Lesson deleted'); },
   });
 
+  if (!user || user.role !== 'admin') return <Navigate to="/" />;
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -221,7 +222,7 @@ export default function AdminCourseContent() {
                     <p className="text-sm text-white truncate">{lesson.title}</p>
                     {lesson.videoFile && (
                       <p className="text-xs text-[#9B98B8] flex items-center gap-1">
-                        <FileVideo className="w-3 h-3" /> Uploaded video{lesson.videoSource === 'youtube' ? ' (YouTube legacy)' : ''}
+                        <FileVideo className="w-3 h-3" /> Uploaded video
                       </p>
                     )}
                   </div>

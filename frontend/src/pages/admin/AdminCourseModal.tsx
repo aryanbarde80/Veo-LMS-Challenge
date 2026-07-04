@@ -131,13 +131,14 @@ export default function AdminCourseModal({ course, onClose, onSuccess }: Props) 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#F0EFF8] mb-1.5">Trailer YouTube ID</label>
+              <label className="block text-sm font-medium text-[#F0EFF8] mb-1.5">Trailer Video URL</label>
               <input
                 value={form.trailerVideoId}
                 onChange={(e) => set('trailerVideoId', e.target.value)}
-                placeholder="dQw4w9WgXcQ"
+                placeholder="/videos/my-trailer.mp4 or https://..."
                 className="w-full px-4 py-2.5 bg-[#0F0F1A] border border-[#2E2E4A] rounded-xl text-white placeholder-[#9B98B8] focus:outline-none focus:border-[#6C47FF] text-sm"
               />
+              <p className="mt-1 text-xs text-[#9B98B8]">Path or URL to an MP4 file — played with the native video player, not embedded.</p>
             </div>
 
             <div>

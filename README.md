@@ -1,9 +1,9 @@
 # VeoLMS — Production-Grade Learning Management System
 
-A full-stack, production-ready LMS inspired by Udemy/Coursera — built with TypeScript, Node.js, React, PostgreSQL, and deployed on Vercel.
+A full-stack, production-ready LMS inspired by Udemy/Coursera — built with TypeScript, Node.js, React, PostgreSQL, and deployed on Render.
 
 ## 🚀 Live Demo
-**URL:** [https://veo-lms-challenge.vercel.app](https://veo-lms-challenge.vercel.app)
+**URL:** update this once your Render services are live (see `render.yaml` — Render gives the API a persistent disk, which self-hosted video storage needs; Vercel's serverless filesystem is ephemeral and will not keep uploaded videos).
 
 **Assignment:** [assignment](https://blossom-flyingfish-887.notion.site/VeoLMS-Core-Team-Selection-Challenge-3861c302735180fe9e81f53bdb218f0c)
 
@@ -28,7 +28,7 @@ A full-stack, production-ready LMS inspired by Udemy/Coursera — built with Typ
 | Database | PostgreSQL on Neon | Serverless Postgres, generous free tier |
 | Payments | Razorpay | Indian market standard, test mode available |
 | Deployment | Vercel (single repo) | Serverless, zero ops, global CDN |
-| Video | YouTube Embed API | Zero storage cost, global CDN, reliable |
+| Video | Custom HTML5 player + self-hosted storage | Full control, no third-party embeds, gated by signed tokens |
 
 ### Monorepo Structure
 ```
@@ -80,21 +80,22 @@ Veo-LMS-Challenge/
 
 ## 💰 Cost Optimization
 
-### Estimated Monthly Cost: ~₹0–₹500
+### Estimated Monthly Cost: ~₹0–₹2,500 (depends on video storage/bandwidth usage)
 
 | Service | Cost | Why |
 |---------|------|-----|
-| Vercel (Hobby) | Free | Serverless, no always-on servers |
-| Neon PostgreSQL | Free tier | 0.5GB storage, serverless Postgres |
-| YouTube Embed | Free | Zero storage, zero bandwidth cost |
-| Total | **~₹0/month** | |
+| Render (API, web service) | Free tier / $25 Pro | Persistent disk keeps uploaded videos across restarts (Vercel can't do this) |
+| Render (frontend, static) | Free | Static Vite build, global CDN |
+| Neon PostgreSQL | Free tier, then usage-based | Serverless Postgres, scales to zero when idle |
+| Video storage (Render disk) | Included up to 1GB, then ~₹/GB | Self-hosted MP4s streamed via Range requests, gated by signed tokens |
+| Total | **~₹0–₹500/month at small scale** | Grows with number/size of uploaded lesson videos |
 
 ### Key Cost Decisions
-- **YouTube for videos** — eliminates S3/R2 storage costs ($0 vs ~$23/GB/month on S3)
-- **Vercel serverless** — pay per invocation, not per hour. No EC2/ECS overhead
+- **Self-hosted video, not YouTube** — full control over access (enrollment-gated streaming), no ads, no third-party branding, no dependency on an external platform's embed policies
+- **Render persistent disk** — unlike Vercel's ephemeral filesystem, uploaded videos actually survive restarts and redeploys here
 - **Neon serverless Postgres** — auto-suspends when idle, free tier covers early-stage
-- **No video processing pipeline** — no FFmpeg workers, no Lambda, no transcoding cost
-- **No CDN needed** — YouTube already delivers video via Google's global CDN
+- **Signed, short-lived streaming tokens** — video files are never served or linked to the public directly; every stream request is authorized per-user, per-lesson
+- **Trade-off, on purpose**: self-hosting costs a little more than "free" YouTube embeds, but this is a real LMS feature (private paid content, resume-from-position, no ads/recommendations pulling students away) — see the `videoStorage.ts` module for the documented upgrade path to S3/R2 if video volume grows significantly
 
 ---
 
@@ -119,17 +120,19 @@ Veo-LMS-Challenge/
 ### Admin
 - [x] Create / Edit / Delete courses
 - [x] Publish/Unpublish courses
-- [x] Manage sections and lessons (add YouTube video IDs)
+- [x] Manage sections and lessons (upload video files directly, no third-party IDs)
 - [x] View all students
 - [x] View all enrollments with revenue
 - [x] Stats dashboard (students, courses, revenue)
 
 ### Video Player
-- [x] YouTube IFrame API integration
+- [x] Custom-built HTML5 `<video>` player — no YouTube/Vimeo embed, no third-party branding or recommendations
+- [x] Signed, short-lived per-lesson streaming tokens + Range-request streaming (seek works properly on large files)
 - [x] Progress saving (10s intervals + on unmount)
 - [x] Resume from exact position
 - [x] Playback speed control (0.5x – 2x)
 - [x] Completion detection (>90% watched = complete)
+- [x] Picture-in-picture, fullscreen, keyboard shortcuts (space/K play, ←/→ seek, F fullscreen, M mute)
 - [x] Responsive 16:9 aspect ratio
 
 ---
@@ -141,7 +144,7 @@ users           -- id, name, email, passwordHash, role (student|admin)
 refresh_tokens  -- userId, token, expiresAt (for secure auth)
 courses         -- title, slug, description, price, difficulty, ...
 sections        -- courseId, title, order
-lessons         -- sectionId, courseId, videoId (YouTube), isPreview, ...
+lessons         -- sectionId, courseId, videoFile (self-hosted, streamed), isPreview, ...
 enrollments     -- userId, courseId, paymentId, amountPaid
 payment_orders  -- tracks Razorpay orders (pending → paid)
 lesson_progress -- userId, lessonId, watchedSeconds, isCompleted
@@ -151,23 +154,43 @@ lesson_progress -- userId, lessonId, watchedSeconds, isCompleted
 
 ## 🚢 Deployment
 
-### Vercel Setup
-1. Connect GitHub repo to Vercel
-2. Set environment variables:
+### Render Setup (recommended — see `render.yaml`)
+Video uploads live on a **persistent disk**, so this needs a host that keeps a
+real filesystem around between requests — Render's standard web service does;
+Vercel's serverless functions don't.
+
+1. Push this repo to GitHub, then in Render: **New → Blueprint**, point it at
+   the repo — `render.yaml` at the root defines both services automatically
+2. Set the secret env vars Render prompts for on the API service:
    ```
-   DATABASE_URL=postgresql://...
+   DATABASE_URL=postgresql://...        # from Neon
    JWT_SECRET=<min 32 chars>
    RAZORPAY_KEY_ID=rzp_test_...
    RAZORPAY_KEY_SECRET=...
-   FRONTEND_URL=https://your-app.vercel.app
    ```
-3. Deploy — Vercel auto-routes `/api/*` to serverless functions
+3. Deploy both services. The API gets a 1GB persistent disk mounted at
+   `uploads/videos` (see `render.yaml`) — this is where lesson videos actually
+   live in production. Bump the disk size in `render.yaml` as your video
+   library grows.
+4. Update `FRONTEND_URL` (API service) and `VITE_API_URL` (frontend service)
+   once you know each service's real `.onrender.com` URL, then redeploy.
+
+### Vercel (frontend only, if you don't need video uploads)
+The frontend alone is a static build and deploys fine on Vercel or any static
+host. Don't deploy the `api/` service to Vercel — its serverless functions run
+on an ephemeral filesystem, so anything written to disk (i.e. every uploaded
+lesson video) disappears almost immediately. Point `vercel.json` at the
+`frontend/` build output only, and set `VITE_API_URL` to your Render-hosted API.
 
 ### Database Setup (Neon)
 1. Create a free Neon project
 2. Copy connection string to `DATABASE_URL`
 3. Run `cd api && npm run db:push` to create tables
-4. Run `cd api && npm run db:seed` to populate demo data
+4. Run `cd api && npm run db:seed` to populate demo data — this also copies two
+   real, freely-licensed sample videos (see `api/seed-assets/videos/ATTRIBUTION.md`)
+   onto the video storage disk so every seeded lesson has an actual playable
+   video behind it. Replace them with real lesson recordings any time via the
+   admin "Upload video" flow — nothing else depends on these specific files.
 
 ---
 
@@ -204,15 +227,22 @@ GET  /api/admin/students   — All students (admin)
 
 ---
 
-## 🔮 Bonus / Future: HLS Streaming
-If video hosting is needed (private content), the upgrade path would be:
-- Upload MP4 to **Cloudflare R2** (free egress)
-- Process with **FFmpeg on a temporary worker** (shut down after processing)
-- Generate HLS playlists and deliver via **Cloudflare CDN**
-- Use **signed URLs** (time-limited) to prevent hotlinking
-- Cost: ~₹200-500/month depending on storage
+## 🔮 Bonus / Future: HLS Streaming & Object Storage
+Today, video is self-hosted MP4 on a persistent disk (Render), streamed via HTTP
+Range requests behind a signed, short-lived per-lesson token — see
+`api/src/lib/videoStorage.ts`. That's a deliberately simple, working baseline.
+If video volume grows enough that a single disk becomes limiting, the upgrade
+path is:
+- Move storage from the Render disk to **Cloudflare R2** or **S3** (both speak
+  the S3 API — `videoStorage.ts` is the only file that needs to change)
+- Process with **FFmpeg on a temporary worker** (shut down after processing) to
+  generate adaptive-bitrate **HLS** playlists instead of single-file MP4
+- Deliver via a CDN in front of the bucket, still behind signed URLs
+- Estimated cost at that point: ~₹200–500/month depending on storage/bandwidth
 
-This was intentionally deferred — YouTube delivers the same quality at zero cost for public educational content.
+This was intentionally deferred — a single self-hosted MP4 per lesson is enough
+for this stage, and avoids the complexity (and third-party dependency) of a full
+video pipeline before it's actually needed.
 
 ---
 

@@ -1,11 +1,38 @@
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
 import { db } from './index';
 import { users, courses, sections, lessons } from './schema';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
+import { ensureUploadDir, UPLOAD_DIR } from '../lib/videoStorage';
+
+// Real, freely-licensed sample videos (see api/seed-assets/videos/ATTRIBUTION.md)
+// copied onto the video storage disk so every seeded lesson has an actual
+// playable file behind it — no YouTube, no placeholders.
+const SEED_ASSETS_DIR = path.join(process.cwd(), 'seed-assets', 'videos');
+const SEED_VIDEOS = ['big-buck-bunny.mp4', 'echo-hereweare.mp4'] as const;
+
+function seedVideoFiles(): { file: string; size: number; mime: string }[] {
+  ensureUploadDir();
+  return SEED_VIDEOS.map((name) => {
+    const src = path.join(SEED_ASSETS_DIR, name);
+    const dest = path.join(UPLOAD_DIR, name);
+    if (!fs.existsSync(dest)) {
+      fs.copyFileSync(src, dest);
+    }
+    return { file: name, size: fs.statSync(dest).size, mime: 'video/mp4' };
+  });
+}
 
 async function seed() {
   console.log('🌱 Seeding database...');
+
+  // Copy sample lesson videos onto the storage disk and grab their real
+  // file size/mime so every lesson below can reference a working video.
+  const [videoA, videoB] = seedVideoFiles();
+  console.log(`✅ Seed videos ready: ${videoA.file}, ${videoB.file}`);
+  const TRAILER_URL = '/videos/big-buck-bunny-trailer.mp4';
 
   // Create admin user
   const adminHash = await bcrypt.hash('Admin@123456', 12);
@@ -60,7 +87,7 @@ async function seed() {
 Perfect for beginners who want a solid foundation in web development.`,
       shortDescription: 'Learn HTML & CSS from scratch and build beautiful, responsive websites with modern techniques.',
       thumbnail: 'https://images.unsplash.com/photo-1621839673705-6617adf9e890?w=800&q=80',
-      trailerVideoId: 'pQN-pnXPaVg',
+      trailerVideoId: TRAILER_URL,
       price: '999',
       instructorId: admin.id,
       difficulty: 'beginner',
@@ -79,13 +106,13 @@ Perfect for beginners who want a solid foundation in web development.`,
   const [sec3] = await db.insert(sections).values({ courseId: htmlCourse.id, title: 'Modern Layouts', order: 3 }).returning();
 
   await db.insert(lessons).values([
-    { sectionId: sec1.id, courseId: htmlCourse.id, title: 'Introduction to Web Development', videoId: 'UB1O30fR-EE', duration: 682, order: 1, isPreview: true, description: 'Overview of how the web works and what we will build.' },
-    { sectionId: sec1.id, courseId: htmlCourse.id, title: 'HTML Document Structure', videoId: 'PlxWf493en4', duration: 1423, order: 2, isPreview: false, description: 'Learn the anatomy of an HTML document.' },
-    { sectionId: sec1.id, courseId: htmlCourse.id, title: 'HTML Semantic Elements', videoId: 'kX3TfdUqpuU', duration: 1654, order: 3, isPreview: false, description: 'Semantic HTML5 elements for better structure.' },
-    { sectionId: sec2.id, courseId: htmlCourse.id, title: 'CSS Selectors & Specificity', videoId: 'l1mER1bV0N0', duration: 1823, order: 4, isPreview: true, description: 'Master CSS selectors and understand specificity.' },
-    { sectionId: sec2.id, courseId: htmlCourse.id, title: 'Box Model & Spacing', videoId: 'rIO5326FgPE', duration: 2145, order: 5, isPreview: false, description: 'Deep dive into the CSS box model.' },
-    { sectionId: sec3.id, courseId: htmlCourse.id, title: 'CSS Flexbox Complete Guide', videoId: 'phWxA89Dy94', duration: 2456, order: 6, isPreview: false, description: 'Master CSS Flexbox for powerful layouts.' },
-    { sectionId: sec3.id, courseId: htmlCourse.id, title: 'CSS Grid Layout', videoId: 'EFafSYg-PkI', duration: 2890, order: 7, isPreview: false, description: 'CSS Grid for two-dimensional layouts.' },
+    { sectionId: sec1.id, courseId: htmlCourse.id, title: 'Introduction to Web Development', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 682, order: 1, isPreview: true, description: 'Overview of how the web works and what we will build.' },
+    { sectionId: sec1.id, courseId: htmlCourse.id, title: 'HTML Document Structure', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 1423, order: 2, isPreview: false, description: 'Learn the anatomy of an HTML document.' },
+    { sectionId: sec1.id, courseId: htmlCourse.id, title: 'HTML Semantic Elements', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1654, order: 3, isPreview: false, description: 'Semantic HTML5 elements for better structure.' },
+    { sectionId: sec2.id, courseId: htmlCourse.id, title: 'CSS Selectors & Specificity', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 1823, order: 4, isPreview: true, description: 'Master CSS selectors and understand specificity.' },
+    { sectionId: sec2.id, courseId: htmlCourse.id, title: 'Box Model & Spacing', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 2145, order: 5, isPreview: false, description: 'Deep dive into the CSS box model.' },
+    { sectionId: sec3.id, courseId: htmlCourse.id, title: 'CSS Flexbox Complete Guide', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 2456, order: 6, isPreview: false, description: 'Master CSS Flexbox for powerful layouts.' },
+    { sectionId: sec3.id, courseId: htmlCourse.id, title: 'CSS Grid Layout', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 2890, order: 7, isPreview: false, description: 'CSS Grid for two-dimensional layouts.' },
   ]);
 
   // =====================
@@ -110,7 +137,7 @@ Perfect for beginners who want a solid foundation in web development.`,
 Build real projects including a weather app, todo list, and more.`,
       shortDescription: 'The complete JavaScript course from beginner to advanced. Master modern JS with 10+ real projects.',
       thumbnail: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=800&q=80',
-      trailerVideoId: 'W6NZfCO5SIk',
+      trailerVideoId: TRAILER_URL,
       price: '1299',
       instructorId: admin.id,
       difficulty: 'beginner',
@@ -128,13 +155,13 @@ Build real projects including a weather app, todo list, and more.`,
   const [jsSec3] = await db.insert(sections).values({ courseId: jsCourse.id, title: 'Async JavaScript', order: 3 }).returning();
 
   await db.insert(lessons).values([
-    { sectionId: jsSec1.id, courseId: jsCourse.id, title: 'What is JavaScript?', videoId: 'W6NZfCO5SIk', duration: 600, order: 1, isPreview: true, description: 'Introduction to JavaScript and how it works in browsers.' },
-    { sectionId: jsSec1.id, courseId: jsCourse.id, title: 'Variables: let, const, var', videoId: 'edlFjlzxkSI', duration: 1023, order: 2, isPreview: false },
-    { sectionId: jsSec1.id, courseId: jsCourse.id, title: 'Data Types & Operators', videoId: '9emXNzqCKyg', duration: 1567, order: 3, isPreview: false },
-    { sectionId: jsSec2.id, courseId: jsCourse.id, title: 'Functions Deep Dive', videoId: 'N8ap4k_1QEQ', duration: 1890, order: 4, isPreview: true },
-    { sectionId: jsSec2.id, courseId: jsCourse.id, title: 'Closures & Scope', videoId: '3a0I8ICR1Vg', duration: 2340, order: 5, isPreview: false },
-    { sectionId: jsSec3.id, courseId: jsCourse.id, title: 'Promises & Async/Await', videoId: 'vn3tm0quoqE', duration: 2890, order: 6, isPreview: false },
-    { sectionId: jsSec3.id, courseId: jsCourse.id, title: 'Fetch API & REST APIs', videoId: 'drK3mKyXeNQ', duration: 2100, order: 7, isPreview: false },
+    { sectionId: jsSec1.id, courseId: jsCourse.id, title: 'What is JavaScript?', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 600, order: 1, isPreview: true, description: 'Introduction to JavaScript and how it works in browsers.' },
+    { sectionId: jsSec1.id, courseId: jsCourse.id, title: 'Variables: let, const, var', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1023, order: 2, isPreview: false },
+    { sectionId: jsSec1.id, courseId: jsCourse.id, title: 'Data Types & Operators', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 1567, order: 3, isPreview: false },
+    { sectionId: jsSec2.id, courseId: jsCourse.id, title: 'Functions Deep Dive', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1890, order: 4, isPreview: true },
+    { sectionId: jsSec2.id, courseId: jsCourse.id, title: 'Closures & Scope', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 2340, order: 5, isPreview: false },
+    { sectionId: jsSec3.id, courseId: jsCourse.id, title: 'Promises & Async/Await', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 2890, order: 6, isPreview: false },
+    { sectionId: jsSec3.id, courseId: jsCourse.id, title: 'Fetch API & REST APIs', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 2100, order: 7, isPreview: false },
   ]);
 
   // =====================
@@ -160,7 +187,7 @@ Build real projects including a weather app, todo list, and more.`,
 Build production-ready applications using modern React patterns.`,
       shortDescription: 'Master React from fundamentals to advanced patterns. Build real apps with hooks, routing, and state management.',
       thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&q=80',
-      trailerVideoId: 'Ke90Tje7VS0',
+      trailerVideoId: TRAILER_URL,
       price: '1499',
       instructorId: admin.id,
       difficulty: 'intermediate',
@@ -178,13 +205,13 @@ Build production-ready applications using modern React patterns.`,
   const [reactSec3] = await db.insert(sections).values({ courseId: reactCourse.id, title: 'State Management', order: 3 }).returning();
 
   await db.insert(lessons).values([
-    { sectionId: reactSec1.id, courseId: reactCourse.id, title: 'What is React & Why Use It?', videoId: 'Ke90Tje7VS0', duration: 560, order: 1, isPreview: true },
-    { sectionId: reactSec1.id, courseId: reactCourse.id, title: 'JSX & Components', videoId: 'RVFAyFWO4go', duration: 1234, order: 2, isPreview: false },
-    { sectionId: reactSec1.id, courseId: reactCourse.id, title: 'Props & Component Composition', videoId: 'kqtD5dpn9C8', duration: 1567, order: 3, isPreview: false },
-    { sectionId: reactSec2.id, courseId: reactCourse.id, title: 'useState Hook', videoId: 'O6P86uwfdR0', duration: 1890, order: 4, isPreview: true },
-    { sectionId: reactSec2.id, courseId: reactCourse.id, title: 'useEffect Hook', videoId: '0ZJgIjIuY7U', duration: 2345, order: 5, isPreview: false },
-    { sectionId: reactSec2.id, courseId: reactCourse.id, title: 'Custom Hooks', videoId: '6ThXsUwLWvc', duration: 2670, order: 6, isPreview: false },
-    { sectionId: reactSec3.id, courseId: reactCourse.id, title: 'Context API', videoId: 'HYKDUF8X3qI', duration: 2980, order: 7, isPreview: false },
+    { sectionId: reactSec1.id, courseId: reactCourse.id, title: 'What is React & Why Use It?', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 560, order: 1, isPreview: true },
+    { sectionId: reactSec1.id, courseId: reactCourse.id, title: 'JSX & Components', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 1234, order: 2, isPreview: false },
+    { sectionId: reactSec1.id, courseId: reactCourse.id, title: 'Props & Component Composition', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1567, order: 3, isPreview: false },
+    { sectionId: reactSec2.id, courseId: reactCourse.id, title: 'useState Hook', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 1890, order: 4, isPreview: true },
+    { sectionId: reactSec2.id, courseId: reactCourse.id, title: 'useEffect Hook', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 2345, order: 5, isPreview: false },
+    { sectionId: reactSec2.id, courseId: reactCourse.id, title: 'Custom Hooks', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 2670, order: 6, isPreview: false },
+    { sectionId: reactSec3.id, courseId: reactCourse.id, title: 'Context API', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 2980, order: 7, isPreview: false },
   ]);
 
   // =====================
@@ -209,7 +236,7 @@ Build production-ready applications using modern React patterns.`,
 - Deployment to production`,
       shortDescription: 'Build scalable REST APIs and backend services with Node.js, Express, and MongoDB.',
       thumbnail: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80',
-      trailerVideoId: 'ENrzD9HAZK4',
+      trailerVideoId: TRAILER_URL,
       price: '1299',
       instructorId: admin.id,
       difficulty: 'intermediate',
@@ -227,12 +254,12 @@ Build production-ready applications using modern React patterns.`,
   const [nodeSec3] = await db.insert(sections).values({ courseId: nodeCourse.id, title: 'Authentication & Security', order: 3 }).returning();
 
   await db.insert(lessons).values([
-    { sectionId: nodeSec1.id, courseId: nodeCourse.id, title: 'What is Node.js?', videoId: 'ENrzD9HAZK4', duration: 800, order: 1, isPreview: true },
-    { sectionId: nodeSec1.id, courseId: nodeCourse.id, title: 'Node.js Modules & npm', videoId: 'xHLd36QoS4k', duration: 1200, order: 2, isPreview: false },
-    { sectionId: nodeSec2.id, courseId: nodeCourse.id, title: 'Building REST APIs with Express', videoId: 'pKd0Rpw7O48', duration: 2345, order: 3, isPreview: true },
-    { sectionId: nodeSec2.id, courseId: nodeCourse.id, title: 'Middleware & Error Handling', videoId: 'lY6icfhap2o', duration: 1890, order: 4, isPreview: false },
-    { sectionId: nodeSec3.id, courseId: nodeCourse.id, title: 'JWT Authentication', videoId: '7Q17ubqLfaM', duration: 2670, order: 5, isPreview: false },
-    { sectionId: nodeSec3.id, courseId: nodeCourse.id, title: 'Password Hashing & Security', videoId: 'AzA_LTDoFqY', duration: 1560, order: 6, isPreview: false },
+    { sectionId: nodeSec1.id, courseId: nodeCourse.id, title: 'What is Node.js?', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 800, order: 1, isPreview: true },
+    { sectionId: nodeSec1.id, courseId: nodeCourse.id, title: 'Node.js Modules & npm', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1200, order: 2, isPreview: false },
+    { sectionId: nodeSec2.id, courseId: nodeCourse.id, title: 'Building REST APIs with Express', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 2345, order: 3, isPreview: true },
+    { sectionId: nodeSec2.id, courseId: nodeCourse.id, title: 'Middleware & Error Handling', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1890, order: 4, isPreview: false },
+    { sectionId: nodeSec3.id, courseId: nodeCourse.id, title: 'JWT Authentication', videoFile: videoB.file, videoSource: 'upload' as const, videoSize: videoB.size, videoMimeType: videoB.mime, duration: 2670, order: 5, isPreview: false },
+    { sectionId: nodeSec3.id, courseId: nodeCourse.id, title: 'Password Hashing & Security', videoFile: videoA.file, videoSource: 'upload' as const, videoSize: videoA.size, videoMimeType: videoA.mime, duration: 1560, order: 6, isPreview: false },
   ]);
 
   console.log('✅ All courses seeded!');

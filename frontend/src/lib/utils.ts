@@ -46,10 +46,6 @@ export function difficultyColor(difficulty: string) {
   }
 }
 
-export function getYoutubeThumbnail(videoId: string): string {
-  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-}
-
 export function getErrorMessage(err: any): string {
   return err?.response?.data?.error || err?.message || 'Something went wrong';
 }

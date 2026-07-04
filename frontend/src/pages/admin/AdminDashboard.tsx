@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate } from 'react-router-dom';
 import {
   BookOpen, Users, TrendingUp, DollarSign, Plus, Edit, Trash2,
-  Eye, EyeOff, Star, ChevronRight, Loader2, LayoutDashboard,
-  GraduationCap, FileText, Settings
+  Eye, EyeOff, ChevronRight, LayoutDashboard,
+  FileText, Settings
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
@@ -17,8 +17,6 @@ type Tab = 'overview' | 'courses' | 'students' | 'enrollments';
 
 export default function AdminDashboard() {
   const { user } = useAuthStore();
-  if (!user) return <Navigate to="/login" />;
-  if (user.role !== 'admin') return <Navigate to="/dashboard" />;
 
   const [tab, setTab] = useState<Tab>('overview');
   const [courseModalOpen, setCourseModalOpen] = useState(false);
@@ -66,6 +64,9 @@ export default function AdminDashboard() {
       toast.success('Course updated');
     },
   });
+
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin') return <Navigate to="/dashboard" />;
 
   const stats: AdminStats = statsData || { totalStudents: 0, totalCourses: 0, totalEnrollments: 0, totalRevenue: 0 };
   const courses = coursesData?.courses || [];

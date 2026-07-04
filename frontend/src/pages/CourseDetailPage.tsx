@@ -36,7 +36,8 @@ export default function CourseDetailPage() {
   const toggleSection = (id: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -181,11 +182,12 @@ export default function CourseDetailPage() {
                 {/* Thumbnail / Trailer */}
                 <div className="relative aspect-video">
                   {trailerOpen && course.trailerVideoId ? (
-                    <iframe
-                      src={`https://www.youtube.com/embed/${course.trailerVideoId}?autoplay=1`}
+                    <video
+                      src={course.trailerVideoId}
                       className="w-full h-full"
-                      allow="autoplay; encrypted-media"
-                      allowFullScreen
+                      controls
+                      autoPlay
+                      playsInline
                     />
                   ) : (
                     <>

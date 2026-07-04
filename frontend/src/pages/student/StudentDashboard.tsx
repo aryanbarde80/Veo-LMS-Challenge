@@ -4,12 +4,10 @@ import { BookOpen, Clock, TrendingUp, Play, ChevronRight, Award, ArrowRight } fr
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 import { Enrollment, RecentActivity } from '../../types';
-import { formatDate, formatMinutes } from '../../lib/utils';
+import { formatDate } from '../../lib/utils';
 
 export default function StudentDashboard() {
   const { user } = useAuthStore();
-  if (!user) return <Navigate to="/login" />;
-  if (user.role === 'admin') return <Navigate to="/admin" />;
 
   const { data: enrollData } = useQuery({
     queryKey: ['enrollments', 'my'],
@@ -20,6 +18,9 @@ export default function StudentDashboard() {
     queryKey: ['recent'],
     queryFn: () => api.get('/enrollments/recent').then((r) => r.data),
   });
+
+  if (!user) return <Navigate to="/login" />;
+  if (user.role === 'admin') return <Navigate to="/admin" />;
 
   const enrollments: Enrollment[] = enrollData?.enrollments || [];
   const recentActivity: RecentActivity[] = recentData?.recent || [];

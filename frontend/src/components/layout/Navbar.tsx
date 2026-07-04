@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GraduationCap, Search, Menu, X, BookOpen, LayoutDashboard, LogOut, User } from 'lucide-react';
+import { GraduationCap, Search, Menu, X, BookOpen, LayoutDashboard, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 export default function Navbar() {

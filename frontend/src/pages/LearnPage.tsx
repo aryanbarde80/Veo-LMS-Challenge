@@ -17,8 +17,6 @@ export default function LearnPage() {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  if (!user) return <Navigate to="/login" />;
-
   const { data: courseData } = useQuery({
     queryKey: ['course', slug],
     queryFn: () => api.get(`/courses/${slug}`).then((r) => r.data),
@@ -89,12 +87,14 @@ export default function LearnPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [activeLessonId, allLessons]);
 
+  if (!user) return <Navigate to="/login" />;
   if (!course?.isEnrolled) return <Navigate to={`/courses/${slug}`} />;
 
   const toggleSection = (id: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
