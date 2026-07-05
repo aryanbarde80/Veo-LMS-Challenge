@@ -22,9 +22,10 @@ export default function CourseDetailPage() {
   const [enrolling, setEnrolling] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['course', slug],
     queryFn: () => api.get(`/courses/${slug}`).then((r) => r.data),
+    retry: false,
   });
 
   const course: Course & { isEnrolled?: boolean; enrollmentCount: number } = data?.course;
@@ -114,9 +115,28 @@ export default function CourseDetailPage() {
   }
 
   if (!course) {
+    const status = (error as any)?.response?.status;
+    const serverMessage = (error as any)?.response?.data?.error;
+    const isRealNotFound = !error || status === 404;
+
     return (
-      <div className="min-h-screen flex items-center justify-center text-[#9B98B8]">
-        Course not found
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
+        <p className="text-[#F0EFF8] text-lg">
+          {isRealNotFound ? 'Course not found' : "Couldn't load this course"}
+        </p>
+        <p className="text-[#9B98B8] text-sm max-w-md">
+          {isRealNotFound
+            ? "This course doesn't exist, or hasn't been published yet."
+            : serverMessage || (error as any)?.message || 'The API request failed. Check that the API is reachable and DATABASE_URL is set correctly on the server.'}
+        </p>
+        {!isRealNotFound && (
+          <button
+            onClick={() => refetch()}
+            className="mt-2 px-4 py-2 rounded-lg bg-[#6C47FF] text-white text-sm hover:bg-[#5A38E0]"
+          >
+            Try again
+          </button>
+        )}
       </div>
     );
   }

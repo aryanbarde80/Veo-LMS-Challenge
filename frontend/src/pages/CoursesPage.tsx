@@ -30,7 +30,7 @@ export default function CoursesPage() {
     setInputValue(q);
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['courses', search],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -38,6 +38,7 @@ export default function CoursesPage() {
       params.set('limit', '40');
       return api.get(`/courses?${params.toString()}`).then((r) => r.data);
     },
+    retry: false,
   });
 
   const allCourses: Course[] = data?.courses || [];
@@ -183,6 +184,20 @@ export default function CoursesPage() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-24 bg-[#1A1A2E] border border-[#2E2E4A] rounded-2xl">
+            <Search className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Couldn't load courses</h3>
+            <p className="text-[#9B98B8] text-sm mb-6 max-w-md mx-auto">
+              {(error as any)?.response?.data?.error || (error as any)?.message || 'The API request failed. Check that the API is reachable and DATABASE_URL is set correctly on the server.'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-5 py-2.5 bg-[#6C47FF] hover:bg-[#5234DB] text-white text-sm rounded-xl font-medium transition-colors"
+            >
+              Try again
+            </button>
           </div>
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
