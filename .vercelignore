@@ -1,9 +1,0 @@
-# This project's backend needs a persistent disk for self-hosted video
-# storage (see api/src/lib/videoStorage.ts) — that only works on Render,
-# not Vercel's ephemeral serverless filesystem. Deploy api/ to Render only.
-#
-# Excluding the whole api/ folder here also prevents Vercel's zero-config
-# Node.js runtime from auto-detecting every .ts file under api/ as its own
-# serverless function, which is what was hitting the Hobby plan's
-# 12-function limit. Vercel should only ever build/serve the frontend.
-api/

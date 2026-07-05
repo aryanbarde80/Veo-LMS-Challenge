@@ -2,7 +2,7 @@ services:
   # ---------------------------------------------------------------------
   # Backend API — Express, deployed as a standard (non-serverless) web
   # service. Unlike Vercel, Render gives this service a persistent disk,
-  # so self-hosted video uploads (api/src/lib/videoStorage.ts) actually
+  # so self-hosted video uploads (api/_src/lib/videoStorage.ts) actually
   # survive restarts and redeploys here.
   # ---------------------------------------------------------------------
   - type: web

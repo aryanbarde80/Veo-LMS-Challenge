@@ -154,33 +154,50 @@ lesson_progress -- userId, lessonId, watchedSeconds, isCompleted
 
 ## 🚢 Deployment
 
-### Render Setup (recommended — see `render.yaml`)
-Video uploads live on a **persistent disk**, so this needs a host that keeps a
-real filesystem around between requests — Render's standard web service does;
-Vercel's serverless functions don't.
+### Vercel — everything in one deploy (recommended for a quick, single-platform setup)
+The whole app (frontend + API) deploys as a single Vercel project — see
+`vercel.json`. The API is exactly **one** Serverless Function
+(`api/index.ts`), so this fits comfortably on the free Hobby plan's 12-function
+limit; all the Express route/db/lib code lives under `api/_src/`, and the
+underscore prefix tells Vercel not to treat those files as separate functions.
 
-1. Push this repo to GitHub, then in Render: **New → Blueprint**, point it at
-   the repo — `render.yaml` at the root defines both services automatically
-2. Set the secret env vars Render prompts for on the API service:
+1. Import the repo into Vercel — it auto-detects `vercel.json` and builds the
+   frontend (`frontend/dist`) plus the one API function
+2. Set these env vars on the project (Project Settings → Environment Variables):
    ```
    DATABASE_URL=postgresql://...        # from Neon
    JWT_SECRET=<min 32 chars>
    RAZORPAY_KEY_ID=rzp_test_...
    RAZORPAY_KEY_SECRET=...
+   FRONTEND_URL=https://your-project.vercel.app
    ```
-3. Deploy both services. The API gets a 1GB persistent disk mounted at
-   `uploads/videos` (see `render.yaml`) — this is where lesson videos actually
-   live in production. Bump the disk size in `render.yaml` as your video
-   library grows.
-4. Update `FRONTEND_URL` (API service) and `VITE_API_URL` (frontend service)
-   once you know each service's real `.onrender.com` URL, then redeploy.
+3. Deploy. The two seeded demo videos (`api/seed-assets/videos`) are bundled
+   directly into the function via `includeFiles` in `vercel.json`, so the
+   demo lessons stream and play with zero extra setup.
+4. Run the DB setup below once (from your own machine, pointed at the same
+   `DATABASE_URL`) to create tables and seed demo data.
 
-### Vercel (frontend only, if you don't need video uploads)
-The frontend alone is a static build and deploys fine on Vercel or any static
-host. Don't deploy the `api/` service to Vercel — its serverless functions run
-on an ephemeral filesystem, so anything written to disk (i.e. every uploaded
-lesson video) disappears almost immediately. Point `vercel.json` at the
-`frontend/` build output only, and set `VITE_API_URL` to your Render-hosted API.
+**One real limitation, worth knowing:** Vercel Functions have a read-only
+filesystem outside `/tmp`. The seeded demo videos always work (they ship with
+the deployment), but a *new* video uploaded through the admin panel after
+that won't reliably survive past the current invocation — there's no
+persistent disk to save it to. Everything else (auth, courses, enrollments,
+payments, progress tracking, the admin dashboard) works exactly the same as
+any other host. If you outgrow this, `api/_src/lib/videoStorage.ts` documents
+the swap to Cloudflare R2/S3 for uploads that actually persist.
+
+### Render — if you need real, persistent video uploads
+Render gives the API service an actual persistent disk, so admin-uploaded
+videos survive restarts and redeploys (not just the seeded demo ones). See
+`render.yaml` at the repo root.
+
+1. Push this repo to GitHub, then in Render: **New → Blueprint**, point it at
+   the repo — `render.yaml` defines both services automatically
+2. Set the same secret env vars as above, when Render prompts for them
+3. Deploy both services. The API gets a 1GB persistent disk mounted at
+   `uploads/videos` — bump the size in `render.yaml` as your library grows
+4. Update `FRONTEND_URL` (API service) and `VITE_API_URL` (frontend service)
+   once you know each service's real `.onrender.com` URL, then redeploy
 
 ### Database Setup (Neon)
 1. Create a free Neon project
@@ -230,7 +247,7 @@ GET  /api/admin/students   — All students (admin)
 ## 🔮 Bonus / Future: HLS Streaming & Object Storage
 Today, video is self-hosted MP4 on a persistent disk (Render), streamed via HTTP
 Range requests behind a signed, short-lived per-lesson token — see
-`api/src/lib/videoStorage.ts`. That's a deliberately simple, working baseline.
+`api/_src/lib/videoStorage.ts`. That's a deliberately simple, working baseline.
 If video volume grows enough that a single disk becomes limiting, the upgrade
 path is:
 - Move storage from the Render disk to **Cloudflare R2** or **S3** (both speak
