@@ -172,11 +172,17 @@ underscore prefix tells Vercel not to treat those files as separate functions.
    RAZORPAY_KEY_SECRET=...
    FRONTEND_URL=https://your-project.vercel.app
    ```
-3. Deploy. The two seeded demo videos (`api/seed-assets/videos`) are bundled
+3. Deploy. That's it — **no manual `db:push` / `db:seed` step needed.**
+   `vercel.json`'s install command runs `api/scripts/vercel-db-setup.sh`,
+   which pushes the schema and seeds the full demo catalog (9 courses, 3
+   real streamed videos, enrollments) automatically on every deploy, as
+   long as `DATABASE_URL` is set. It's safe to run on every deploy — the
+   seed script upserts/replaces instead of duplicating (see `db/seed.ts`).
+   If `DATABASE_URL` isn't set yet, this step just logs a warning and skips
+   itself instead of failing the whole build; add the env var and redeploy.
+4. The two seeded demo videos (`api/seed-assets/videos`) are bundled
    directly into the function via `includeFiles` in `vercel.json`, so the
    demo lessons stream and play with zero extra setup.
-4. Run the DB setup below once (from your own machine, pointed at the same
-   `DATABASE_URL`) to create tables and seed demo data.
 
 **One real limitation, worth knowing:** Vercel Functions have a read-only
 filesystem outside `/tmp`. The seeded demo videos always work (they ship with
@@ -201,6 +207,8 @@ videos survive restarts and redeploys (not just the seeded demo ones). See
    once you know each service's real `.onrender.com` URL, then redeploy
 
 ### Database Setup (Neon)
+> On Vercel this happens automatically on every deploy (see step 3 above) --
+> this section is for Render, or running these commands manually/locally.
 1. Create a free Neon project
 2. Copy connection string to `DATABASE_URL`
 3. Run `cd api && npm run db:push` to create tables
