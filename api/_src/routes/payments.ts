@@ -91,7 +91,13 @@ router.post('/create-order', authenticate, async (req: AuthRequest, res: Respons
     if (err?.message?.includes('RAZORPAY_KEY')) {
       return res.status(500).json({ error: 'Payments are not configured on the server yet.' });
     }
-    return res.status(500).json({ error: 'Failed to create payment order' });
+    // The Razorpay SDK throws the actual API error as err.error (description/reason/code),
+    // not err.message -- surface it so the real cause (bad keys, test/live mismatch,
+    // account not activated, etc.) is visible without needing server log access.
+    const razorpayDetail = err?.error?.description || err?.error?.reason || err?.description;
+    return res.status(500).json({
+      error: razorpayDetail ? `Payment gateway error: ${razorpayDetail}` : 'Failed to create payment order',
+    });
   }
 });
 
