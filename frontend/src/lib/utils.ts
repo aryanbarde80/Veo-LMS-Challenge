@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { SyntheticEvent } from 'react';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -48,4 +49,13 @@ export function difficultyColor(difficulty: string) {
 
 export function getErrorMessage(err: any): string {
   return err?.response?.data?.error || err?.message || 'Something went wrong';
+}
+
+// Shared fallback for any course/lesson thumbnail <img> — swaps to a local,
+// always-available placeholder if the real thumbnail URL 404s or the host
+// is unreachable, instead of showing a broken image icon.
+export function handleThumbnailError(e: SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  if (img.src.endsWith('/images/course-placeholder.svg')) return; // avoid loop
+  img.src = '/images/course-placeholder.svg';
 }

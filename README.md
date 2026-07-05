@@ -10,7 +10,8 @@ A full-stack, production-ready LMS inspired by Udemy/Coursera — built with Typ
 ### Demo Credentials
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@veolms.com | Admin@123456 |
+| Admin / Instructor | admin@veolms.com | Admin@123456 |
+| Admin / Instructor | priya@veolms.com | Admin@123456 |
 | Student | student@veolms.com | Student@123456 |
 
 ---
@@ -203,11 +204,23 @@ videos survive restarts and redeploys (not just the seeded demo ones). See
 1. Create a free Neon project
 2. Copy connection string to `DATABASE_URL`
 3. Run `cd api && npm run db:push` to create tables
-4. Run `cd api && npm run db:seed` to populate demo data — this also copies two
-   real, freely-licensed sample videos (see `api/seed-assets/videos/ATTRIBUTION.md`)
-   onto the video storage disk so every seeded lesson has an actual playable
-   video behind it. Replace them with real lesson recordings any time via the
-   admin "Upload video" flow — nothing else depends on these specific files.
+4. Run `cd api && npm run db:seed` to populate demo data. This creates:
+   - **9 published courses** across HTML/CSS, JavaScript, React, Node.js,
+     TypeScript, Python, MongoDB, Next.js, and Docker — each with 3 sections
+     and 6-8 real lessons (64 lessons total), taught by two instructor
+     accounts (`admin@veolms.com`, `priya@veolms.com`, both `Admin@123456`)
+   - **3 real, freely-licensed sample videos** (see
+     `api/seed-assets/videos/ATTRIBUTION.md`) copied onto the video storage
+     disk and cycled across every lesson, so each one actually streams
+     through the app's own custom player — nothing is embedded, nothing is
+     a placeholder. Replace them with real recordings any time via the
+     admin "Upload video" flow.
+   - **A demo student** (`student@veolms.com` / `Student@123456`) enrolled
+     in 4 of the 9 courses with realistic, varied progress — one fully
+     completed, others partway through — so the dashboard and
+     "continue watching" UI have real data to show immediately.
+   - Safe to run more than once: it upserts by slug/email and cleanly
+     replaces each course's sections/lessons instead of duplicating them.
 
 ---
 

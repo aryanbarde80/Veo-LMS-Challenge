@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, decimal, pgEnum, serial, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, decimal, pgEnum, serial, uuid, unique } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const userRoleEnum = pgEnum('user_role', ['student', 'admin']);
@@ -88,7 +88,11 @@ export const enrollments = pgTable('enrollments', {
   amountPaid: decimal('amount_paid', { precision: 10, scale: 2 }).notNull().default('0'),
   enrolledAt: timestamp('enrolled_at').defaultNow().notNull(),
   completedAt: timestamp('completed_at'),
-});
+}, (table) => ({
+  // One enrollment per student per course -- also what makes
+  // `.onConflictDoNothing()` in the seed script actually do something.
+  userCourseUnique: unique().on(table.userId, table.courseId),
+}));
 
 // Lesson Progress
 export const lessonProgress = pgTable('lesson_progress', {
@@ -99,7 +103,14 @@ export const lessonProgress = pgTable('lesson_progress', {
   watchedSeconds: integer('watched_seconds').notNull().default(0),
   isCompleted: boolean('is_completed').notNull().default(false),
   lastWatchedAt: timestamp('last_watched_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  // Required for routes/enrollments.ts's `.onConflictDoUpdate({ target:
+  // [lessonProgress.userId, lessonProgress.lessonId] })` to work at all --
+  // Postgres rejects an ON CONFLICT target that has no matching unique/
+  // exclusion constraint. Without this, every single progress-save request
+  // (the app's core "resume where you left off" feature) throws.
+  userLessonUnique: unique().on(table.userId, table.lessonId),
+}));
 
 // Razorpay Orders (pending payments)
 export const paymentOrders = pgTable('payment_orders', {

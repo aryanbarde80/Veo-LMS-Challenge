@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Clock, Users, BookOpen, Play, Lock, CheckCircle, ChevronDown, Star, Award } from 'lucide-react';
 import { api } from '../lib/api';
 import { Course, Section } from '../types';
-import { formatPrice, formatMinutes, formatDuration, difficultyColor, cn } from '../lib/utils';
+import { formatPrice, formatMinutes, formatDuration, difficultyColor, cn, handleThumbnailError } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
@@ -191,7 +191,7 @@ export default function CourseDetailPage() {
                     />
                   ) : (
                     <>
-                      <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                      <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" onError={handleThumbnailError} />
                       {course.trailerVideoId && (
                         <button
                           onClick={() => setTrailerOpen(true)}

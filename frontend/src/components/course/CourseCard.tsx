@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Clock, Users, Star } from 'lucide-react';
 import { Course } from '../../types';
-import { formatPrice, formatMinutes, difficultyColor, cn } from '../../lib/utils';
+import { formatPrice, formatMinutes, difficultyColor, cn, handleThumbnailError } from '../../lib/utils';
 
 interface CourseCardProps {
   course: Course;
@@ -24,6 +24,7 @@ export default function CourseCard({ course, featured }: CourseCardProps) {
             alt={course.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
+            onError={handleThumbnailError}
           />
           {/* Badges */}
           <div className="absolute top-2 left-2 flex gap-1.5">
